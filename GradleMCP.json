@@ -1,0 +1,16 @@
+{
+  "id": "IsThatAppleClient-1.8.9",
+  "inheritsFrom": "1.8.9",
+  "time": "2024-01-01T00:00:00+00:00",
+  "releaseTime": "2024-01-01T00:00:00+00:00",
+  "type": "release",
+  "mainClass": "Start",
+  "libraries": [
+    {
+      "name": "net.minecraft:launchwrapper:1.11"
+    },
+    {
+      "name": "org.ow2.asm:asm-all:5.0.3"
+    }
+  ]
+}

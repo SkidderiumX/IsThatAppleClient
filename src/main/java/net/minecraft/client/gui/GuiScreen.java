@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.commands.ClientCommands;
 import net.minecraft.client.gui.stream.GuiTwitchUserMode;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderHelper;
@@ -432,6 +433,11 @@ public abstract class GuiScreen extends Gui implements GuiYesNoCallback
         if (addToChat)
         {
             this.mc.ingameGUI.getChatGUI().addToSentMessages(msg);
+        }
+
+        if (ClientCommands.handle(this.mc, msg))
+        {
+            return;
         }
 
         this.mc.thePlayer.sendChatMessage(msg);

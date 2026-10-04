@@ -85,6 +85,25 @@ public class GameSettings
     public boolean invertMouse;
     public int renderDistanceChunks = -1;
     public boolean viewBobbing = true;
+
+    /**
+     * When true, moving forward always starts a sprint, as though the sprint key were
+     * held down. Sneaking, eating, blindness and an empty hunger bar still prevent it.
+     */
+    public boolean alwaysSprint = false;
+
+    /**
+     * When true the world/camera itself sways while walking. The item and hand always
+     * follow {@link #viewBobbing}; this controls only the aim-affecting camera bob, so
+     * turning it off keeps the crosshair steady while still bobbing the hand.
+     */
+    public boolean cameraBobbing = false;
+
+    /**
+     * When true the view no longer tilts when the player takes damage, so aiming is not
+     * thrown off. The death roll and the red damage flash are unaffected.
+     */
+    public boolean noHurtCam = false;
     public boolean anaglyph;
     public boolean fboEnable = true;
     public int limitFramerate = 120;
@@ -153,6 +172,15 @@ public class GameSettings
     public KeyBinding keyBindSmoothCamera = new KeyBinding("key.smoothCamera", 0, "key.categories.misc");
     public KeyBinding keyBindFullscreen = new KeyBinding("key.fullscreen", 87, "key.categories.misc");
     public KeyBinding keyBindSpectatorOutlines = new KeyBinding("key.spectatorOutlines", 0, "key.categories.misc");
+
+    /** Free look bind. Defaults to V, which vanilla leaves unbound. See {@code FreeLook}. */
+    public KeyBinding keyBindFreeLook = new KeyBinding("key.freeLook", 47, "key.categories.misc");
+
+    /**
+     * Opens the client's own settings screen. Left unbound so it cannot shadow a vanilla key; the
+     * same screen is on the pause menu and behind {@code /config}.
+     */
+    public KeyBinding keyBindClientSettings = new KeyBinding("key.clientSettings", 0, "key.categories.misc");
     public KeyBinding keyBindStreamStartStop = new KeyBinding("key.streamStartStop", 64, "key.categories.stream");
     public KeyBinding keyBindStreamPauseUnpause = new KeyBinding("key.streamPauseUnpause", 65, "key.categories.stream");
     public KeyBinding keyBindStreamCommercials = new KeyBinding("key.streamCommercial", 0, "key.categories.stream");
@@ -265,7 +293,7 @@ public class GameSettings
 
     public GameSettings(Minecraft mcIn, File optionsFileIn)
     {
-        this.keyBindings = (KeyBinding[])((KeyBinding[])ArrayUtils.addAll(new KeyBinding[] {this.keyBindAttack, this.keyBindUseItem, this.keyBindForward, this.keyBindLeft, this.keyBindBack, this.keyBindRight, this.keyBindJump, this.keyBindSneak, this.keyBindSprint, this.keyBindDrop, this.keyBindInventory, this.keyBindChat, this.keyBindPlayerList, this.keyBindPickBlock, this.keyBindCommand, this.keyBindScreenshot, this.keyBindTogglePerspective, this.keyBindSmoothCamera, this.keyBindStreamStartStop, this.keyBindStreamPauseUnpause, this.keyBindStreamCommercials, this.keyBindStreamToggleMic, this.keyBindFullscreen, this.keyBindSpectatorOutlines}, this.keyBindsHotbar));
+        this.keyBindings = (KeyBinding[])((KeyBinding[])ArrayUtils.addAll(new KeyBinding[] {this.keyBindAttack, this.keyBindUseItem, this.keyBindForward, this.keyBindLeft, this.keyBindBack, this.keyBindRight, this.keyBindJump, this.keyBindSneak, this.keyBindSprint, this.keyBindDrop, this.keyBindInventory, this.keyBindChat, this.keyBindPlayerList, this.keyBindPickBlock, this.keyBindCommand, this.keyBindScreenshot, this.keyBindTogglePerspective, this.keyBindSmoothCamera, this.keyBindStreamStartStop, this.keyBindStreamPauseUnpause, this.keyBindStreamCommercials, this.keyBindStreamToggleMic, this.keyBindFullscreen, this.keyBindSpectatorOutlines, this.keyBindFreeLook, this.keyBindClientSettings}, this.keyBindsHotbar));
         this.difficulty = EnumDifficulty.NORMAL;
         this.lastServer = "";
         this.fovSetting = 70.0F;
@@ -307,7 +335,7 @@ public class GameSettings
 
     public GameSettings()
     {
-        this.keyBindings = (KeyBinding[])((KeyBinding[])ArrayUtils.addAll(new KeyBinding[] {this.keyBindAttack, this.keyBindUseItem, this.keyBindForward, this.keyBindLeft, this.keyBindBack, this.keyBindRight, this.keyBindJump, this.keyBindSneak, this.keyBindSprint, this.keyBindDrop, this.keyBindInventory, this.keyBindChat, this.keyBindPlayerList, this.keyBindPickBlock, this.keyBindCommand, this.keyBindScreenshot, this.keyBindTogglePerspective, this.keyBindSmoothCamera, this.keyBindStreamStartStop, this.keyBindStreamPauseUnpause, this.keyBindStreamCommercials, this.keyBindStreamToggleMic, this.keyBindFullscreen, this.keyBindSpectatorOutlines}, this.keyBindsHotbar));
+        this.keyBindings = (KeyBinding[])((KeyBinding[])ArrayUtils.addAll(new KeyBinding[] {this.keyBindAttack, this.keyBindUseItem, this.keyBindForward, this.keyBindLeft, this.keyBindBack, this.keyBindRight, this.keyBindJump, this.keyBindSneak, this.keyBindSprint, this.keyBindDrop, this.keyBindInventory, this.keyBindChat, this.keyBindPlayerList, this.keyBindPickBlock, this.keyBindCommand, this.keyBindScreenshot, this.keyBindTogglePerspective, this.keyBindSmoothCamera, this.keyBindStreamStartStop, this.keyBindStreamPauseUnpause, this.keyBindStreamCommercials, this.keyBindStreamToggleMic, this.keyBindFullscreen, this.keyBindSpectatorOutlines, this.keyBindFreeLook, this.keyBindClientSettings}, this.keyBindsHotbar));
         this.difficulty = EnumDifficulty.NORMAL;
         this.lastServer = "";
         this.fovSetting = 70.0F;
@@ -860,6 +888,21 @@ public class GameSettings
                                 this.viewBobbing = astring[1].equals("true");
                             }
 
+                            if (astring[0].equals("bobCamera"))
+                            {
+                                this.cameraBobbing = astring[1].equals("true");
+                            }
+
+                            if (astring[0].equals("noHurtCam"))
+                            {
+                                this.noHurtCam = astring[1].equals("true");
+                            }
+
+                            if (astring[0].equals("alwaysSprint"))
+                            {
+                                this.alwaysSprint = astring[1].equals("true");
+                            }
+
                             if (astring[0].equals("anaglyph3d"))
                             {
                                 this.anaglyph = astring[1].equals("true");
@@ -1240,6 +1283,9 @@ public class GameSettings
             printwriter.println("guiScale:" + this.guiScale);
             printwriter.println("particles:" + this.particleSetting);
             printwriter.println("bobView:" + this.viewBobbing);
+            printwriter.println("bobCamera:" + this.cameraBobbing);
+            printwriter.println("noHurtCam:" + this.noHurtCam);
+            printwriter.println("alwaysSprint:" + this.alwaysSprint);
             printwriter.println("anaglyph3d:" + this.anaglyph);
             printwriter.println("maxFps:" + this.limitFramerate);
             printwriter.println("fboEnable:" + this.fboEnable);
@@ -1329,6 +1375,12 @@ public class GameSettings
 
         this.saveOfOptions();
         this.sendSettingsToServer();
+
+        // client.cfg is the source of truth for the handful of settings vanilla keeps here
+        // (field of view, the two bobbing switches, no hurt cam, always sprint). Every Options
+        // "Done" button funnels through saveOptions, so syncing here means a slider moved in the
+        // vanilla menus cannot be quietly reverted on the next launch.
+        net.minecraft.client.commands.ClientConfig.saveVanilla();
     }
 
     public float getSoundLevel(SoundCategory sndCategory)
@@ -3081,6 +3133,9 @@ public class GameSettings
     {
         this.renderDistanceChunks = 8;
         this.viewBobbing = true;
+        this.cameraBobbing = false;
+        this.noHurtCam = false;
+        this.alwaysSprint = false;
         this.anaglyph = false;
         this.limitFramerate = (int)GameSettings.Options.FRAMERATE_LIMIT.getValueMax();
         this.enableVsync = false;

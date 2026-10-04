@@ -1754,7 +1754,7 @@ public abstract class EntityLivingBase extends Entity
             else if (this.onGround && this.jumpTicks == 0)
             {
                 this.jump();
-                this.jumpTicks = 10;
+                this.jumpTicks = 0;
             }
         }
         else

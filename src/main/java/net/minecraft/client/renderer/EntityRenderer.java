@@ -15,6 +15,9 @@ import net.minecraft.block.BlockBed;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.commands.Animations;
+import net.minecraft.client.commands.FreeLook;
+import net.minecraft.client.commands.ReachCircle;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.gui.GuiChat;
 import net.minecraft.client.gui.GuiDownloadTerrain;
@@ -350,6 +353,10 @@ public class EntityRenderer implements IResourceManagerReloadListener
         }
 
         Entity entity = this.mc.getRenderViewEntity();
+
+        // Feeds the smoothed crouch height consumed by modifyEyeHeight below.
+        Animations.updateEyeHeight(entity);
+
         double d2 = entity.posX;
         double d0 = entity.posY + (double)entity.getEyeHeight();
         double d1 = entity.posZ;
@@ -616,7 +623,11 @@ public class EntityRenderer implements IResourceManagerReloadListener
                 GlStateManager.rotate(40.0F - 8000.0F / (f1 + 200.0F), 0.0F, 0.0F, 1.0F);
             }
 
-            if (f < 0.0F)
+            // NoHurtCam skips only the damage tilt. The death roll above is left alone:
+            // removing that too would leave no feedback at all that you died.
+            // Gated here rather than at the call sites so the camera and both hand
+            // passes (which also call this) cannot drift apart.
+            if (this.mc.gameSettings.noHurtCam || f < 0.0F)
             {
                 return;
             }
@@ -649,7 +660,17 @@ public class EntityRenderer implements IResourceManagerReloadListener
     private void orientCamera(float partialTicks)
     {
         Entity entity = this.mc.getRenderViewEntity();
-        float f = entity.getEyeHeight();
+        float f = Animations.modifyEyeHeight(entity, partialTicks);
+
+        // Free look leaves the body rotation alone and swings the view off it instead. Both are
+        // zero whenever free look is idle, so these fold straight into the camera angles below.
+        // Gated on the view entity, so spectating something else cannot inherit the offset, and
+        // on the view itself, so a /freelook view restriction is honoured on the very frame F5
+        // is pressed rather than one tick later.
+        boolean thirdPerson = this.mc.gameSettings.thirdPersonView > 0;
+        boolean freeLooking = entity == this.mc.thePlayer;
+        float freeYaw = freeLooking ? FreeLook.getYawOffset(thirdPerson) : 0.0F;
+        float freePitch = freeLooking ? FreeLook.getPitchOffset(thirdPerson) : 0.0F;
         double d0 = entity.prevPosX + (entity.posX - entity.prevPosX) * (double)partialTicks;
         double d1 = entity.prevPosY + (entity.posY - entity.prevPosY) * (double)partialTicks + (double)f;
         double d2 = entity.prevPosZ + (entity.posZ - entity.prevPosZ) * (double)partialTicks;
@@ -675,8 +696,8 @@ public class EntityRenderer implements IResourceManagerReloadListener
                     GlStateManager.rotate((float)(j * 90), 0.0F, 1.0F, 0.0F);
                 }
 
-                GlStateManager.rotate(entity.prevRotationYaw + (entity.rotationYaw - entity.prevRotationYaw) * partialTicks + 180.0F, 0.0F, -1.0F, 0.0F);
-                GlStateManager.rotate(entity.prevRotationPitch + (entity.rotationPitch - entity.prevRotationPitch) * partialTicks, -1.0F, 0.0F, 0.0F);
+                GlStateManager.rotate(entity.prevRotationYaw + (entity.rotationYaw - entity.prevRotationYaw) * partialTicks + freeYaw + 180.0F, 0.0F, -1.0F, 0.0F);
+                GlStateManager.rotate(entity.prevRotationPitch + (entity.rotationPitch - entity.prevRotationPitch) * partialTicks + freePitch, -1.0F, 0.0F, 0.0F);
             }
         }
         else if (this.mc.gameSettings.thirdPersonView > 0)
@@ -689,17 +710,25 @@ public class EntityRenderer implements IResourceManagerReloadListener
             }
             else
             {
+                // f1/f2 must stay on the body angles. The rotate/translate sandwich below acts
+                // on the camera offset vector, so it has to be the identity for the camera to
+                // end up at eye minus the view direction times d3; folding free look into it
+                // would place the camera at body pitch plus twice the free look pitch. The
+                // collision probe gets its own angles so it still follows the camera.
                 float f1 = entity.rotationYaw;
                 float f2 = entity.rotationPitch;
+                float rayYaw = f1 + freeYaw;
+                float rayPitch = f2 + freePitch;
 
                 if (this.mc.gameSettings.thirdPersonView == 2)
                 {
                     f2 += 180.0F;
+                    rayPitch += 180.0F;
                 }
 
-                double d4 = (double)(-MathHelper.sin(f1 / 180.0F * (float)Math.PI) * MathHelper.cos(f2 / 180.0F * (float)Math.PI)) * d3;
-                double d5 = (double)(MathHelper.cos(f1 / 180.0F * (float)Math.PI) * MathHelper.cos(f2 / 180.0F * (float)Math.PI)) * d3;
-                double d6 = (double)(-MathHelper.sin(f2 / 180.0F * (float)Math.PI)) * d3;
+                double d4 = (double)(-MathHelper.sin(rayYaw / 180.0F * (float)Math.PI) * MathHelper.cos(rayPitch / 180.0F * (float)Math.PI)) * d3;
+                double d5 = (double)(MathHelper.cos(rayYaw / 180.0F * (float)Math.PI) * MathHelper.cos(rayPitch / 180.0F * (float)Math.PI)) * d3;
+                double d6 = (double)(-MathHelper.sin(rayPitch / 180.0F * (float)Math.PI)) * d3;
 
                 for (int i = 0; i < 8; ++i)
                 {
@@ -743,8 +772,8 @@ public class EntityRenderer implements IResourceManagerReloadListener
         {
             if (!this.mc.gameSettings.debugCamEnable)
             {
-                float f6 = entity.prevRotationYaw + (entity.rotationYaw - entity.prevRotationYaw) * partialTicks + 180.0F;
-                float f7 = entity.prevRotationPitch + (entity.rotationPitch - entity.prevRotationPitch) * partialTicks;
+                float f6 = entity.prevRotationYaw + (entity.rotationYaw - entity.prevRotationYaw) * partialTicks + freeYaw + 180.0F;
+                float f7 = entity.prevRotationPitch + (entity.rotationPitch - entity.prevRotationPitch) * partialTicks + freePitch;
                 float f8 = 0.0F;
 
                 if (entity instanceof EntityAnimal)
@@ -766,7 +795,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
         }
         else if (!this.mc.gameSettings.debugCamEnable)
         {
-            GlStateManager.rotate(entity.prevRotationPitch + (entity.rotationPitch - entity.prevRotationPitch) * partialTicks, 1.0F, 0.0F, 0.0F);
+            GlStateManager.rotate(entity.prevRotationPitch + (entity.rotationPitch - entity.prevRotationPitch) * partialTicks + freePitch, 1.0F, 0.0F, 0.0F);
 
             if (entity instanceof EntityAnimal)
             {
@@ -775,7 +804,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
             }
             else
             {
-                GlStateManager.rotate(entity.prevRotationYaw + (entity.rotationYaw - entity.prevRotationYaw) * partialTicks + 180.0F, 0.0F, 1.0F, 0.0F);
+                GlStateManager.rotate(entity.prevRotationYaw + (entity.rotationYaw - entity.prevRotationYaw) * partialTicks + freeYaw + 180.0F, 0.0F, 1.0F, 0.0F);
             }
         }
 
@@ -833,7 +862,9 @@ public class EntityRenderer implements IResourceManagerReloadListener
 
         this.hurtCameraEffect(partialTicks);
 
-        if (this.mc.gameSettings.viewBobbing)
+        // The camera bob moves the whole world, which drags the crosshair around while aiming.
+        // The hand still bobs via renderHand, so gate only this one on the extra setting.
+        if (this.mc.gameSettings.viewBobbing && this.mc.gameSettings.cameraBobbing)
         {
             this.setupViewBobbing(partialTicks);
         }
@@ -1411,7 +1442,7 @@ public class EntityRenderer implements IResourceManagerReloadListener
             GlStateManager.matrixMode(5888);
             GlStateManager.loadIdentity();
             this.orientCamera(partialTicks);
-            GlStateManager.translate(0.0F, entity.getEyeHeight(), 0.0F);
+            GlStateManager.translate(0.0F, Animations.modifyEyeHeight(entity, partialTicks), 0.0F);
             RenderGlobal.drawOutlinedBoundingBox(new AxisAlignedBB(0.0D, 0.0D, 0.0D, 0.005D, 1.0E-4D, 1.0E-4D), 255, 0, 0, 255);
             RenderGlobal.drawOutlinedBoundingBox(new AxisAlignedBB(0.0D, 0.0D, 0.0D, 1.0E-4D, 1.0E-4D, 0.005D), 0, 0, 255, 255);
             RenderGlobal.drawOutlinedBoundingBox(new AxisAlignedBB(0.0D, 0.0D, 0.0D, 1.0E-4D, 0.0033D, 1.0E-4D), 0, 255, 0, 255);
@@ -1811,6 +1842,10 @@ public class EntityRenderer implements IResourceManagerReloadListener
             this.mc.mcProfiler.endStartSection("forge_render_last");
             Reflector.callVoid(Reflector.ForgeHooksClient_dispatchRenderLast, new Object[] {renderglobal, Float.valueOf(partialTicks)});
         }
+
+        // Overlays the finished world. Runs on every pass, which is what anaglyph wants: each pass
+        // carries its own colour mask, so drawing here puts the ring in both eyes.
+        ReachCircle.render(partialTicks);
 
         this.mc.mcProfiler.endStartSection("hand");
 

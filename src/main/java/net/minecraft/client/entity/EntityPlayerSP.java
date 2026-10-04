@@ -3,6 +3,8 @@ package net.minecraft.client.entity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.MovingSoundMinecartRiding;
 import net.minecraft.client.audio.PositionedSoundRecord;
+import net.minecraft.client.commands.FreeLook;
+import net.minecraft.client.commands.JumpDelay;
 import net.minecraft.client.gui.GuiCommandBlock;
 import net.minecraft.client.gui.GuiEnchantment;
 import net.minecraft.client.gui.GuiHopper;
@@ -49,6 +51,7 @@ import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.util.MovementInput;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.Vec3;
 import net.minecraft.world.IInteractionObject;
 import net.minecraft.world.World;
 
@@ -107,6 +110,52 @@ public class EntityPlayerSP extends AbstractClientPlayer
         }
     }
 
+    /**
+     * Free look intercepts the one place vanilla turns raw mouse deltas into rotation, so the
+     * body rotation is left untouched while the camera is off it.
+     *
+     * @return true if the deltas went to the free look camera instead of the body
+     */
+    @Override
+    public void setAngles(float yaw, float pitch)
+    {
+        if (FreeLook.onMouseLook(yaw, pitch))
+        {
+            return;
+        }
+
+        super.setAngles(yaw, pitch);
+    }
+
+    /**
+     * Adds the free look offsets onto the look vector, so the crosshair, the block outline and
+     * block breaking follow the camera. Mirrors {@code EntityLivingBase.getLook}, which reads
+     * {@code rotationYawHead} rather than {@code rotationYaw}.
+     */
+    @Override
+    public Vec3 getLook(float partialTicks)
+    {
+        // Read through the view-aware accessors so a /freelook view restriction applies to the
+        // crosshair and the block raytrace, not just to the camera angles.
+        boolean thirdPerson = this.mc.gameSettings.thirdPersonView > 0;
+        float freeYaw = FreeLook.getYawOffset(thirdPerson);
+        float freePitch = FreeLook.getPitchOffset(thirdPerson);
+
+        if (freeYaw == 0.0F && freePitch == 0.0F)
+        {
+            return super.getLook(partialTicks);
+        }
+
+        if (partialTicks == 1.0F)
+        {
+            return this.getVectorForRotation(this.rotationPitch + freePitch, this.rotationYawHead + freeYaw);
+        }
+
+        return this.getVectorForRotation(
+            this.prevRotationPitch + (this.rotationPitch - this.prevRotationPitch) * partialTicks + freePitch,
+            this.prevRotationYawHead + (this.rotationYawHead - this.prevRotationYawHead) * partialTicks + freeYaw);
+    }
+
     public void onUpdate()
     {
         if (this.worldObj.isBlockLoaded(new BlockPos(this.posX, 0.0D, this.posZ)))
@@ -116,7 +165,7 @@ public class EntityPlayerSP extends AbstractClientPlayer
             if (this.isRiding())
             {
                 this.sendQueue.addToSendQueue(new C03PacketPlayer.C05PacketPlayerLook(this.rotationYaw, this.rotationPitch, this.onGround));
-                this.sendQueue.addToSendQueue(new C0CPacketInput(this.moveStrafing, this.moveForward, this.movementInput.jump, this.movementInput.sneak));
+                this.sendQueue.addToSendQueue(new C0CPacketInput(this.moveStrafing, this.moveForward, this.movementInput.jump && JumpDelay.allowsJump(), this.movementInput.sneak));
             }
             else
             {
@@ -565,16 +614,38 @@ public class EntityPlayerSP extends AbstractClientPlayer
     {
         super.updateEntityActionState();
 
+        // Stepped before the key is read rather than inside the test below, so the gap keeps
+        // counting down even while the jump key is up. isJumping is what the jump gate in
+        // EntityLivingBase reads, so this is the one place the free-to-jump decision is made.
+        boolean jumpAllowed = JumpDelay.step();
+
         if (this.isCurrentViewEntity())
         {
             this.moveStrafing = this.movementInput.moveStrafe;
             this.moveForward = this.movementInput.moveForward;
-            this.isJumping = this.movementInput.jump;
+
+            // Water and lava hang off the same flag, and the delay must not take swimming with it:
+            // jumping on land and then falling in would otherwise cost a second of not rising.
+            this.isJumping = this.movementInput.jump
+                && (jumpAllowed || this.isInWater() || this.isInLava());
             this.prevRenderArmYaw = this.renderArmYaw;
             this.prevRenderArmPitch = this.renderArmPitch;
             this.renderArmPitch = (float)((double)this.renderArmPitch + (double)(this.rotationPitch - this.renderArmPitch) * 0.5D);
             this.renderArmYaw = (float)((double)this.renderArmYaw + (double)(this.rotationYaw - this.renderArmYaw) * 0.5D);
         }
+    }
+
+    /**
+     * Starts the jump delay's countdown off the jump that actually happened.
+     *
+     * <p>Hooking the jump rather than the key press means holding jump in the air does not burn a
+     * gap that was never used, and no guesswork is needed about whether the jump will be allowed
+     * by the water and lava branches that sit in front of it.</p>
+     */
+    public void jump()
+    {
+        super.jump();
+        JumpDelay.onJumped();
     }
 
     protected boolean isCurrentViewEntity()
@@ -688,6 +759,16 @@ public class EntityPlayerSP extends AbstractClientPlayer
         if (this.isSprinting() && (this.movementInput.moveForward < f || this.isCollidedHorizontally || !flag3))
         {
             this.setSprinting(false);
+        }
+
+        // Runs after the vanilla sprint checks above so it wins over the stop condition.
+        // The same guards vanilla uses are kept, otherwise this would sprint while
+        // sneaking, eating, blind, or on an empty hunger bar.
+        if (this.mc.gameSettings.alwaysSprint && !this.isSprinting() && !this.isSneaking()
+            && this.movementInput.moveForward >= f && !this.isCollidedHorizontally
+            && flag3 && !this.isUsingItem() && !this.isPotionActive(Potion.blindness))
+        {
+            this.setSprinting(true);
         }
 
         if (this.capabilities.allowFlying)

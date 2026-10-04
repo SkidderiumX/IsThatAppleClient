@@ -4,7 +4,11 @@ import net.minecraft.client.Minecraft;
 
 public class Timer
 {
-    float ticksPerSecond;
+    /**
+     * Ticks the game loop aims for per second. Public so the tick speed mod can raise it; the
+     * world it drives is held to {@code 20} separately, see {@code TickSpeed}.
+     */
+    public float ticksPerSecond;
     private double lastHRTime;
     public int elapsedTicks;
     public float renderPartialTicks;

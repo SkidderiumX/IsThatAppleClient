@@ -39,9 +39,15 @@ import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.audio.MusicTicker;
 import net.minecraft.client.audio.SoundHandler;
+import net.minecraft.client.commands.Animations;
+import net.minecraft.client.commands.ClientConfig;
+import net.minecraft.client.commands.FpsOverlay;
+import net.minecraft.client.commands.FreeLook;
+import net.minecraft.client.commands.TickSpeed;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiChat;
+import net.minecraft.client.gui.GuiClientSettings;
 import net.minecraft.client.gui.GuiControls;
 import net.minecraft.client.gui.GuiGameOver;
 import net.minecraft.client.gui.GuiIngame;
@@ -188,6 +194,17 @@ import org.lwjgl.util.glu.GLU;
 public class Minecraft implements IThreadListener, IPlayerUsage
 {
     private static final Logger logger = LogManager.getLogger();
+
+    /**
+     * The name this client puts on screen, shown in the window title, on the main menu and in
+     * the corner of the video settings.
+     *
+     * <p>Held here so the three places that show it cannot drift apart. Deliberately not the jar
+     * or version name: those are build and launcher concerns and live in {@code settings.gradle}
+     * and the launcher's version json, so renaming this one does not have to touch either.</p>
+     */
+    public static final String CLIENT_NAME = "IsThatAppleClient";
+
     private static final ResourceLocation locationMojangPng = new ResourceLocation("textures/gui/title/mojang.png");
     public static final boolean isRunningOnMac = Util.getOSType() == Util.EnumOS.OSX;
     public static byte[] memoryReserve = new byte[10485760];
@@ -281,6 +298,11 @@ public class Minecraft implements IThreadListener, IPlayerUsage
     public boolean renderChunksMany = true;
     long debugUpdateTime = getSystemTime();
     int fpsCounter;
+
+    public int getFpsCounter()
+    {
+        return this.fpsCounter;
+    }
     long prevFrameTime = -1L;
     private String debugProfilerName = "root";
 
@@ -391,6 +413,10 @@ public class Minecraft implements IThreadListener, IPlayerUsage
     private void startGame() throws LWJGLException, IOException
     {
         this.gameSettings = new GameSettings(this, this.mcDataDir);
+
+        // Reads client.cfg, importing the older per-mod files the first time, and re-applies the
+        // vanilla settings it owns. Must stay here, before anything can call saveOptions().
+        ClientConfig.load();
         this.defaultResourcePacks.add(this.mcDefaultResourcePack);
         this.startTimerHackThread();
 
@@ -542,7 +568,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
     private void createDisplay() throws LWJGLException
     {
         Display.setResizable(true);
-        Display.setTitle("Minecraft 1.8.9");
+        Display.setTitle(CLIENT_NAME);
 
         try
         {
@@ -975,6 +1001,11 @@ public class Minecraft implements IThreadListener, IPlayerUsage
             this.shutdown();
         }
 
+        // Tick speed has to be in before updateTimer, which is what turns the rate into the
+        // elapsedTicks the loop below counts over. A frame with no tick to run never reaches
+        // runTick at all, so applying it from there would be a frame late at best.
+        TickSpeed.applyTo(this.timer);
+
         if (this.isGamePaused && this.theWorld != null)
         {
             float f = this.timer.renderPartialTicks;
@@ -1361,6 +1392,33 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
     private void sendClickBlockToController(boolean leftClick)
     {
+        // Old block-hit animations. This runs in addition to the vanilla pass below,
+        // matching the original: while the use key is held the player is normally
+        // isUsingItem(), which makes vanilla's own branch inert, so the two do not
+        // double up. The swing itself is vanilla's swingItem(), so it keeps the
+        // "restart halfway through" rule.
+        if (Animations.isBlockHit() && Animations.isPushing() && this.gameSettings.keyBindUseItem.isKeyDown())
+        {
+            if (this.leftClickCounter <= 0 && leftClick && this.objectMouseOver != null && this.objectMouseOver.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK)
+            {
+                BlockPos blockpos = this.objectMouseOver.getBlockPos();
+
+                if (!this.theWorld.isAirBlock(blockpos) && this.thePlayer.isAllowEdit())
+                {
+                    if (Animations.isPushingParticle())
+                    {
+                        this.effectRenderer.addBlockHitEffects(blockpos, this.objectMouseOver.sideHit);
+                    }
+
+                    this.thePlayer.swingItem();
+                }
+            }
+            else
+            {
+                this.playerController.resetBlockRemoving();
+            }
+        }
+
         if (!leftClick)
         {
             this.leftClickCounter = 0;
@@ -1937,6 +1995,11 @@ public class Minecraft implements IThreadListener, IPlayerUsage
                 }
             }
 
+            if (this.currentScreen == null && this.gameSettings.keyBindClientSettings.isPressed())
+            {
+                this.displayGuiScreen(new GuiClientSettings(this));
+            }
+
             boolean flag = this.gameSettings.chatVisibility != EntityPlayer.EnumChatVisibility.HIDDEN;
 
             while (this.gameSettings.keyBindInventory.isPressed())
@@ -2018,9 +2081,18 @@ public class Minecraft implements IThreadListener, IPlayerUsage
             this.sendClickBlockToController(this.currentScreen == null && this.gameSettings.keyBindAttack.isKeyDown() && this.inGameHasFocus);
         }
 
+        // One world tick per 20 Hz however fast the input ticks above are running. Taken once,
+        // here, because everything below shares it: the world update carries the player's physics
+        // and its movement packets, and the sound and particle sections advance their own clocks
+        // by a tick each, so all of it has to stay on the same 20 Hz the server runs at. The
+        // isGamePaused test is kept ahead of the tick speed call so a pause neither eats the
+        // schedule nor lets a backlog build up. Everything above this point - key polling, mouse
+        // handling, the GUI - is deliberately left free to run at the raised rate.
+        final boolean worldTick = !this.isGamePaused && TickSpeed.isWorldTick();
+
         if (this.theWorld != null)
         {
-            if (this.thePlayer != null)
+            if (this.thePlayer != null && worldTick)
             {
                 ++this.joinPlayerCounter;
 
@@ -2033,21 +2105,21 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
             this.mcProfiler.endStartSection("gameRenderer");
 
-            if (!this.isGamePaused)
+            if (worldTick)
             {
                 this.entityRenderer.updateRenderer();
             }
 
             this.mcProfiler.endStartSection("levelRenderer");
 
-            if (!this.isGamePaused)
+            if (worldTick)
             {
                 this.renderGlobal.updateClouds();
             }
 
             this.mcProfiler.endStartSection("level");
 
-            if (!this.isGamePaused)
+            if (worldTick)
             {
                 if (this.theWorld.getLastLightningBolt() > 0)
                 {
@@ -2062,7 +2134,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
             this.entityRenderer.stopUseShader();
         }
 
-        if (!this.isGamePaused)
+        if (worldTick)
         {
             this.mcMusicTicker.update();
             this.mcSoundHandler.update();
@@ -2070,7 +2142,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
         if (this.theWorld != null)
         {
-            if (!this.isGamePaused)
+            if (worldTick)
             {
                 this.theWorld.setAllowedSpawnTypes(this.theWorld.getDifficulty() != EnumDifficulty.PEACEFUL, true);
 
@@ -2098,14 +2170,14 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
             this.mcProfiler.endStartSection("animateTick");
 
-            if (!this.isGamePaused && this.theWorld != null)
+            if (worldTick)
             {
                 this.theWorld.doVoidFogParticles(MathHelper.floor_double(this.thePlayer.posX), MathHelper.floor_double(this.thePlayer.posY), MathHelper.floor_double(this.thePlayer.posZ));
             }
 
             this.mcProfiler.endStartSection("particles");
 
-            if (!this.isGamePaused)
+            if (worldTick)
             {
                 this.effectRenderer.updateEffects();
             }
