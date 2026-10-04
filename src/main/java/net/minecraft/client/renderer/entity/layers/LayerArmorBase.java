@@ -2,6 +2,7 @@ package net.minecraft.client.renderer.entity.layers;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import net.minecraft.client.commands.Animations;
 import net.minecraft.client.model.ModelBase;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.entity.RendererLivingEntity;
@@ -44,9 +45,13 @@ public abstract class LayerArmorBase<T extends ModelBase> implements LayerRender
         this.renderLayer(entitylivingbaseIn, p_177141_2_, p_177141_3_, partialTicks, p_177141_5_, p_177141_6_, p_177141_7_, scale, 1);
     }
 
+    /**
+     * Vanilla blends the armour damage overlay into the base armour texture. The old
+     * animations drop the overlay entirely, so damaged pieces keep their normal colour.
+     */
     public boolean shouldCombineTextures()
     {
-        return false;
+        return Animations.isArmorDamage();
     }
 
     private void renderLayer(EntityLivingBase entitylivingbaseIn, float p_177182_2_, float p_177182_3_, float partialTicks, float p_177182_5_, float p_177182_6_, float p_177182_7_, float scale, int armorSlot)

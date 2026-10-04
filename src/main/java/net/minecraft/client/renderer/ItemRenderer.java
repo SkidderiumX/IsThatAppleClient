@@ -4,6 +4,7 @@ import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.commands.Animations;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
@@ -334,22 +335,22 @@ public class ItemRenderer
                     switch (enumaction)
                     {
                         case NONE:
-                            this.transformFirstPersonItem(f, 0.0F);
+                            this.transformFirstPersonItem(f, Animations.isBlockHit() ? f1 : 0.0F);
                             break;
 
                         case EAT:
                         case DRINK:
                             this.performDrinking(abstractclientplayer, partialTicks);
-                            this.transformFirstPersonItem(f, 0.0F);
+                            this.transformFirstPersonItem(f, Animations.isBlockHit() ? f1 : 0.0F);
                             break;
 
                         case BLOCK:
-                            this.transformFirstPersonItem(f, 0.0F);
+                            this.transformFirstPersonItem(f, Animations.isBlockHit() ? f1 : 0.0F);
                             this.doBlockTransformations();
                             break;
 
                         case BOW:
-                            this.transformFirstPersonItem(f, 0.0F);
+                            this.transformFirstPersonItem(f, Animations.isBlockHit() ? f1 : 0.0F);
                             this.doBowTransformations(partialTicks, abstractclientplayer);
                     }
                 }
@@ -359,7 +360,7 @@ public class ItemRenderer
                     this.transformFirstPersonItem(f, f1);
                 }
 
-                this.renderItem(abstractclientplayer, this.itemToRender, ItemCameraTransforms.TransformType.FIRST_PERSON);
+                this.renderHeldItem(abstractclientplayer);
             }
             else if (!abstractclientplayer.isInvisible())
             {
@@ -528,6 +529,12 @@ public class ItemRenderer
 
     public void updateEquippedItem()
     {
+        if (Animations.isItemSwitch())
+        {
+            this.updateEquippedItemSmooth();
+            return;
+        }
+
         this.prevEquippedProgress = this.equippedProgress;
         EntityPlayer entityplayer = this.mc.thePlayer;
         ItemStack itemstack = entityplayer.inventory.getCurrentItem();
@@ -565,6 +572,84 @@ public class ItemRenderer
         float f = flag ? 0.0F : 1.0F;
         float f1 = MathHelper.clamp_float(f - this.equippedProgress, -f2, f2);
         this.equippedProgress += f1;
+
+        if (this.equippedProgress < 0.1F)
+        {
+            this.itemToRender = itemstack;
+            this.equippedItemSlot = entityplayer.inventory.currentItem;
+
+            if (Config.isShaders())
+            {
+                Shaders.setItemToRenderMain(itemstack);
+            }
+        }
+    }
+
+    /**
+     * Draws the held stack, optionally using the old rod/fishing-line pose for flat items
+     * such as signs, banners and the fishing rod itself.
+     *
+     * <p>Vanilla renders flat items edge-on, which makes them nearly invisible in first
+     * person. The old pose rotates them to the classic fishing-rod angle.</p>
+     */
+    private void renderHeldItem(AbstractClientPlayer player)
+    {
+        ItemStack held = this.itemToRender;
+
+        if (Animations.isRod() && !this.mc.getRenderItem().shouldRenderItemIn3D(held))
+        {
+            if (held.getItem().shouldRotateAroundWhenRendering())
+            {
+                GlStateManager.rotate(180.0F, 0.0F, 1.0F, 0.0F);
+            }
+
+            GlStateManager.translate(0.58800083F, 0.06999986F, -0.77000016F);
+            GlStateManager.scale(1.5F, 1.5F, 1.5F);
+            GlStateManager.rotate(50.0F, 0.0F, 1.0F, 0.0F);
+            GlStateManager.rotate(335.0F, 0.0F, 0.0F, 1.0F);
+            GlStateManager.translate(-0.9375F, -0.0625F, 0.0F);
+            GlStateManager.scale(-2.0F, 2.0F, -2.0F);
+            GlStateManager.scale(0.5F, 0.5F, 0.5F);
+            this.renderItem(player, held, ItemCameraTransforms.TransformType.NONE);
+            return;
+        }
+
+        this.renderItem(player, held, ItemCameraTransforms.TransformType.FIRST_PERSON);
+    }
+
+    /**
+     * Old-style item switch: the held stack slides out and back on a fixed step instead
+     * of easing, and two stacks of the same item never trigger a swap.
+     *
+     * <p>The Glide client used {@code flag ? 1.0F : 0.0F} for the target here, the
+     * reverse of vanilla's {@code flag ? 0.0F : 1.0F}. That drove equippedProgress to 1
+     * (lowered) whenever the item was <em>not</em> being swapped, which parked the held
+     * item off-screen. Vanilla's polarity is used instead.</p>
+     */
+    private void updateEquippedItemSmooth()
+    {
+        this.prevEquippedProgress = this.equippedProgress;
+        EntityPlayer entityplayer = this.mc.thePlayer;
+        ItemStack itemstack = entityplayer.inventory.getCurrentItem();
+        boolean flag = this.equippedItemSlot == entityplayer.inventory.currentItem && itemstack == this.itemToRender;
+
+        if (this.itemToRender == null && itemstack == null)
+        {
+            flag = true;
+        }
+
+        if (itemstack != null && this.itemToRender != null && itemstack != this.itemToRender
+            && itemstack.getItem() == this.itemToRender.getItem()
+            && itemstack.getItemDamage() == this.itemToRender.getItemDamage())
+        {
+            this.itemToRender = itemstack;
+            flag = true;
+        }
+
+        float f = 0.4F;
+        float f1 = flag ? 0.0F : 1.0F;
+        float f2 = MathHelper.clamp_float(f1 - this.equippedProgress, -f, f);
+        this.equippedProgress += f2;
 
         if (this.equippedProgress < 0.1F)
         {

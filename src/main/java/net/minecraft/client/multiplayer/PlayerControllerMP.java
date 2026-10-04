@@ -5,6 +5,7 @@ import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.PositionedSoundRecord;
+import net.minecraft.client.commands.Animations;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.network.NetHandlerPlayClient;
 import net.minecraft.entity.Entity;
@@ -227,15 +228,25 @@ public class PlayerControllerMP
         }
     }
 
+    /**
+     * Aborts any in-progress block break.
+     *
+     * <p>Vanilla wraps the whole body in {@code if (isHittingBlock)}. When
+     * {@link #getIsHittingBlock()} is forced false by the old block-hit animations the
+     * flag is never set, so a stale break-progress bar and a non-zero
+     * {@code curBlockDamageMP} would survive. Those three resets therefore run
+     * unconditionally; only the abort packet stays gated.</p>
+     */
     public void resetBlockRemoving()
     {
         if (this.isHittingBlock)
         {
             this.netClientHandler.addToSendQueue(new C07PacketPlayerDigging(C07PacketPlayerDigging.Action.ABORT_DESTROY_BLOCK, this.currentBlock, EnumFacing.DOWN));
             this.isHittingBlock = false;
-            this.curBlockDamageMP = 0.0F;
-            this.mc.theWorld.sendBlockBreakProgress(this.mc.thePlayer.getEntityId(), this.currentBlock, -1);
         }
+
+        this.curBlockDamageMP = 0.0F;
+        this.mc.theWorld.sendBlockBreakProgress(this.mc.thePlayer.getEntityId(), this.currentBlock, -1);
     }
 
     public boolean onPlayerDamageBlock(BlockPos posBlock, EnumFacing directionFacing)
@@ -535,6 +546,13 @@ public class PlayerControllerMP
 
     public boolean getIsHittingBlock()
     {
+        // With the old block-hit animations the swing and particles are faked locally, so
+        // the client must never ask the server to start breaking the block.
+        if (Animations.isBlockHit() && Animations.isPushing())
+        {
+            return false;
+        }
+
         return this.isHittingBlock;
     }
 }

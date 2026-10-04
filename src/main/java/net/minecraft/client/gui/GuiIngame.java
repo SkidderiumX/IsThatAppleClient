@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Random;
 import net.minecraft.block.material.Material;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.commands.Animations;
+import net.minecraft.client.commands.CoordsHud;
+import net.minecraft.client.commands.FpsOverlay;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.RenderHelper;
 import net.minecraft.client.renderer.Tessellator;
@@ -211,6 +214,9 @@ public class GuiIngame extends Gui
         {
             this.overlayDebug.renderDebugInfo(scaledresolution);
         }
+
+        FpsOverlay.render(this.mc, scaledresolution, partialTicks);
+        CoordsHud.render(this.mc, scaledresolution, partialTicks);
 
         if (this.recordPlayingUpFor > 0)
         {
@@ -703,7 +709,10 @@ public class GuiIngame extends Gui
 
                 this.drawTexturedModalRect(i4, j4, 16 + k3 * 9, 9 * k4, 9, 9);
 
-                if (flag)
+                // Old animations suppress the damage overlay: the extra flashing hearts
+                // that preview recently lost health never appear, so the bar drops straight
+                // to the real value. j6 + 54 / j6 + 63 are exactly those two draws.
+                if (flag && !Animations.isHealth())
                 {
                     if (i6 * 2 + 1 < j)
                     {

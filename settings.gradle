@@ -1,2 +1,4 @@
-rootProject.name = 'GradleMCP-Base'
+// Drives the jar filename, which the launcher matches to the version folder by name.
+// Keep this, the deployed folder, and the launcher version json's id in step.
+rootProject.name = 'IsThatAppleClient-1.8.9'
 

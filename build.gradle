@@ -3,7 +3,24 @@ plugins {
 }
 
 group = 'net.example'
-version = '1.8.9'
+// The Minecraft version, without the client name. settings.gradle's rootProject.name already
+// ends in the version, and Gradle appends this one, so setting both to the full name would
+// produce a doubled suffix.
+version = ''
+
+// Minecraft 1.8.9 must run on Java 8 (TLauncher's "legacy" JRE). Gradle otherwise
+// emits whatever bytecode the daemon's JDK targets, and links against newer APIs
+// (e.g. OptiFine's ByteBuffer.limit(int) resolves to the Java 9+ covariant
+// signature, which does not exist on Java 8). `release` pins both.
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 8
+    options.encoding = 'UTF-8'
+}
 
 repositories {
     mavenCentral()
