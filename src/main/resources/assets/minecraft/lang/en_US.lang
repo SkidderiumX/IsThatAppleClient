@@ -26,7 +26,6 @@ translation.test.world=world
 menu.game=Game menu
 menu.singleplayer=Singleplayer
 menu.multiplayer=Multiplayer
-menu.online=Minecraft Realms
 menu.options=Options...
 menu.quit=Quit Game
 menu.returnToMenu=Save and Quit to Title
@@ -405,7 +404,6 @@ options.touchscreen=Touchscreen Mode
 options.blockAlternatives=Alternate Blocks
 options.reducedDebugInfo=Reduced Debug Info
 options.entityShadows=Entity Shadows
-options.realmsNotifications=Realms Notifications
 
 options.mipmapLevels=Mipmap Levels
 options.forceUnicodeFont=Force Unicode Font
