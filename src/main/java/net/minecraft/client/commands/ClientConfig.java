@@ -65,20 +65,17 @@ public final class ClientConfig
     /** {@link FreeLook}. */
     public static final String SECTION_FREELOOK = "freelook";
 
-    /** Settings for the ground ring drawn at the player's feet. See {@link ReachCircle}. */
-    public static final String SECTION_REACHCIRCLE = "reachcircle";
-
     /** Settings for the coordinates and look direction readout. See {@link CoordsHud}. */
     public static final String SECTION_COORDS = "coords";
 
     /** Settings for handing the free look offset to the body. See {@link LookVector}. */
     public static final String SECTION_LOOKVECTOR = "lookvector";
 
-    /** Settings for the client's own tick rate. See {@link TickSpeed}. */
-    public static final String SECTION_TICKSPEED = "tickspeed";
-
     /** Settings for the gap between jumps. See {@link JumpDelay}. */
     public static final String SECTION_JUMPDELAY = "jumpdelay";
+
+    /** Settings for the pinned client-side time of day. See {@link TimeChanger}. */
+    public static final String SECTION_TIMECHANGER = "timechanger";
 
     /** Lowest field of view {@code /fov} accepts. */
     private static final float MIN_FOV = 1.0F;
@@ -702,10 +699,6 @@ public final class ClientConfig
                 }
             }, null, null));
 
-        // --- reach circle -----------------------------------------------------------
-
-        list.add(masterToggle(SECTION_REACHCIRCLE, "enabled", "Reach circle"));
-
         // --- position HUD -----------------------------------------------------------
 
         list.add(masterToggle(SECTION_COORDS, "enabled", "Position HUD"));
@@ -756,25 +749,6 @@ public final class ClientConfig
 
         list.add(masterToggle(SECTION_LOOKVECTOR, "enabled", "Real look vector"));
 
-        // --- tick speed ------------------------------------------------------------
-
-        list.add(masterToggle(SECTION_TICKSPEED, "enabled", "Tick speed"));
-
-        list.add(new Setting(SECTION_TICKSPEED, "ticks", "Ticks per second", Kind.SLIDER, null,
-            TickSpeed.MIN_TICKS, TickSpeed.MAX_TICKS, false, new Getter()
-        {
-            public String get()
-            {
-                return String.valueOf(TickSpeed.getTicks());
-            }
-        }, new Setter()
-        {
-            public void set(String raw)
-            {
-                TickSpeed.setTicks(parseNumber(raw, TickSpeed.getTicks()));
-            }
-        }, SECTION_TICKSPEED, "enabled"));
-
         // --- jump delay ------------------------------------------------------------
 
         list.add(masterToggle(SECTION_JUMPDELAY, "enabled", "Jump delay"));
@@ -793,6 +767,25 @@ public final class ClientConfig
                 JumpDelay.setDelay(Math.round(parseNumber(raw, JumpDelay.getDelay())));
             }
         }, SECTION_JUMPDELAY, "enabled"));
+
+        // --- time changer ----------------------------------------------------------
+
+        list.add(masterToggle(SECTION_TIMECHANGER, "enabled", "Time changer"));
+
+        list.add(new Setting(SECTION_TIMECHANGER, "time", "Time of day", Kind.SLIDER, null,
+            (float)TimeChanger.MIN_TIME, (float)TimeChanger.MAX_TIME, false, new Getter()
+        {
+            public String get()
+            {
+                return String.valueOf(TimeChanger.getTime());
+            }
+        }, new Setter()
+        {
+            public void set(String raw)
+            {
+                TimeChanger.setTime(Math.round(parseNumber(raw, TimeChanger.getTime())));
+            }
+        }, SECTION_TIMECHANGER, "enabled"));
 
         return Collections.unmodifiableList(list);
     }
@@ -824,10 +817,6 @@ public final class ClientConfig
                 {
                     FreeLook.setEnabled(value);
                 }
-                else if (SECTION_REACHCIRCLE.equals(section))
-                {
-                    ReachCircle.setEnabled(value);
-                }
                 else if (SECTION_COORDS.equals(section))
                 {
                     CoordsHud.setEnabled(value);
@@ -836,13 +825,13 @@ public final class ClientConfig
                 {
                     LookVector.setEnabled(value);
                 }
-                else if (SECTION_TICKSPEED.equals(section))
-                {
-                    TickSpeed.setEnabled(value);
-                }
                 else if (SECTION_JUMPDELAY.equals(section))
                 {
                     JumpDelay.setEnabled(value);
+                }
+                else if (SECTION_TIMECHANGER.equals(section))
+                {
+                    TimeChanger.setEnabled(value);
                 }
             }
         }, null, null);
@@ -860,11 +849,6 @@ public final class ClientConfig
             return FpsOverlay.isEnabled();
         }
 
-        if (SECTION_REACHCIRCLE.equals(section))
-        {
-            return ReachCircle.isEnabled();
-        }
-
         if (SECTION_COORDS.equals(section))
         {
             return CoordsHud.isEnabled();
@@ -875,14 +859,14 @@ public final class ClientConfig
             return LookVector.isEnabled();
         }
 
-        if (SECTION_TICKSPEED.equals(section))
-        {
-            return TickSpeed.isEnabled();
-        }
-
         if (SECTION_JUMPDELAY.equals(section))
         {
             return JumpDelay.isEnabled();
+        }
+
+        if (SECTION_TIMECHANGER.equals(section))
+        {
+            return TimeChanger.isEnabled();
         }
 
         return FreeLook.isEnabled();
@@ -939,11 +923,6 @@ public final class ClientConfig
             return "Free look";
         }
 
-        if (SECTION_REACHCIRCLE.equals(section))
-        {
-            return "Reach circle";
-        }
-
         if (SECTION_COORDS.equals(section))
         {
             return "Position HUD";
@@ -954,14 +933,14 @@ public final class ClientConfig
             return "Real look vector";
         }
 
-        if (SECTION_TICKSPEED.equals(section))
-        {
-            return "Tick speed";
-        }
-
         if (SECTION_JUMPDELAY.equals(section))
         {
             return "Jump delay";
+        }
+
+        if (SECTION_TIMECHANGER.equals(section))
+        {
+            return "Time changer";
         }
 
         return section;
@@ -995,11 +974,10 @@ public final class ClientConfig
             Animations.resetToDefaults();
             FpsOverlay.resetToDefaults();
             FreeLook.resetToDefaults();
-            ReachCircle.resetToDefaults();
             CoordsHud.resetToDefaults();
             LookVector.resetToDefaults();
-        TickSpeed.resetToDefaults();
         JumpDelay.resetToDefaults();
+        TimeChanger.resetToDefaults();
 
             File file = getConfigFile();
             Map<String, Map<String, String>> parsed = parse(file);
@@ -1296,11 +1274,10 @@ public final class ClientConfig
             Animations.reset();
             FpsOverlay.reset();
             FreeLook.reset();
-            ReachCircle.reset();
             CoordsHud.reset();
             LookVector.reset();
-            TickSpeed.reset();
             JumpDelay.reset();
+            TimeChanger.reset();
 
             GameSettings settings = gameSettings();
 

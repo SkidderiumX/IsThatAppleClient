@@ -17,7 +17,7 @@ public class ClientCommands
 {
     private static final List<ClientCommand> COMMANDS = Collections.unmodifiableList(
             Arrays.<ClientCommand>asList(new FovCommand(), new BobCommand(), new SprintCommand(), new FpsCommand(),
-                new NhkCommand(), new AnimationsCommand(), new FreeLookCommand(), new ReachCircleCommand(), new CoordsCommand(), new LookVectorCommand(), new TickSpeedCommand(), new JumpDelayCommand(), new ConfigCommand()));
+                new NhkCommand(), new AnimationsCommand(), new FreeLookCommand(), new CoordsCommand(), new LookVectorCommand(), new JumpDelayCommand(), new TimeChangerCommand(), new ConfigCommand()));
 
     private ClientCommands() {}
 

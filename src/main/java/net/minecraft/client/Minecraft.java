@@ -41,7 +41,7 @@ import net.minecraft.client.commands.Animations;
 import net.minecraft.client.commands.ClientConfig;
 import net.minecraft.client.commands.FpsOverlay;
 import net.minecraft.client.commands.FreeLook;
-import net.minecraft.client.commands.TickSpeed;
+import net.minecraft.client.commands.TimeChanger;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiChat;
@@ -976,11 +976,6 @@ public class Minecraft implements IThreadListener, IPlayerUsage
         {
             this.shutdown();
         }
-
-        // Tick speed has to be in before updateTimer, which is what turns the rate into the
-        // elapsedTicks the loop below counts over. A frame with no tick to run never reaches
-        // runTick at all, so applying it from there would be a frame late at best.
-        TickSpeed.applyTo(this.timer);
 
         if (this.isGamePaused && this.theWorld != null)
         {
@@ -2047,14 +2042,9 @@ public class Minecraft implements IThreadListener, IPlayerUsage
             this.sendClickBlockToController(this.currentScreen == null && this.gameSettings.keyBindAttack.isKeyDown() && this.inGameHasFocus);
         }
 
-        // One world tick per 20 Hz however fast the input ticks above are running. Taken once,
-        // here, because everything below shares it: the world update carries the player's physics
-        // and its movement packets, and the sound and particle sections advance their own clocks
-        // by a tick each, so all of it has to stay on the same 20 Hz the server runs at. The
-        // isGamePaused test is kept ahead of the tick speed call so a pause neither eats the
-        // schedule nor lets a backlog build up. Everything above this point - key polling, mouse
-        // handling, the GUI - is deliberately left free to run at the raised rate.
-        final boolean worldTick = !this.isGamePaused && TickSpeed.isWorldTick();
+        // World work below runs once per tick, gated on pause so opening a pausing GUI
+        // neither runs the world behind it nor lets a backlog build up.
+        final boolean worldTick = !this.isGamePaused;
 
         if (this.theWorld != null)
         {
@@ -2132,6 +2122,11 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
                     throw new ReportedException(crashreport2);
                 }
+            }
+
+            if (worldTick)
+            {
+                TimeChanger.applyTo(this.theWorld);
             }
 
             this.mcProfiler.endStartSection("animateTick");
