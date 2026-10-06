@@ -41,6 +41,7 @@ import net.minecraft.client.commands.Animations;
 import net.minecraft.client.commands.ClientConfig;
 import net.minecraft.client.commands.FpsOverlay;
 import net.minecraft.client.commands.FreeLook;
+import net.minecraft.client.commands.NoHitDelay;
 import net.minecraft.client.commands.TimeChanger;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.FontRenderer;
@@ -1429,7 +1430,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
             {
                 logger.error("Null returned as \'hitResult\', this shouldn\'t happen!");
 
-                if (this.playerController.isNotCreative())
+                if (this.playerController.isNotCreative() && !NoHitDelay.isEnabled())
                 {
                     this.leftClickCounter = 10;
                 }
@@ -1453,7 +1454,7 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
                     case MISS:
                     default:
-                        if (this.playerController.isNotCreative())
+                        if (this.playerController.isNotCreative() && !NoHitDelay.isEnabled())
                         {
                             this.leftClickCounter = 10;
                         }

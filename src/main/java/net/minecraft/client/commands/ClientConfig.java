@@ -77,6 +77,9 @@ public final class ClientConfig
     /** Settings for the pinned client-side time of day. See {@link TimeChanger}. */
     public static final String SECTION_TIMECHANGER = "timechanger";
 
+    /** Settings for skipping the click cooldown after a miss. See {@link NoHitDelay}. */
+    public static final String SECTION_NOHITDELAY = "nohitdelay";
+
     /** Lowest field of view {@code /fov} accepts. */
     private static final float MIN_FOV = 1.0F;
 
@@ -787,6 +790,10 @@ public final class ClientConfig
             }
         }, SECTION_TIMECHANGER, "enabled"));
 
+        // --- no hit delay ----------------------------------------------------------
+
+        list.add(masterToggle(SECTION_NOHITDELAY, "enabled", "No hit delay"));
+
         return Collections.unmodifiableList(list);
     }
 
@@ -833,6 +840,10 @@ public final class ClientConfig
                 {
                     TimeChanger.setEnabled(value);
                 }
+                else if (SECTION_NOHITDELAY.equals(section))
+                {
+                    NoHitDelay.setEnabled(value);
+                }
             }
         }, null, null);
     }
@@ -867,6 +878,11 @@ public final class ClientConfig
         if (SECTION_TIMECHANGER.equals(section))
         {
             return TimeChanger.isEnabled();
+        }
+
+        if (SECTION_NOHITDELAY.equals(section))
+        {
+            return NoHitDelay.isEnabled();
         }
 
         return FreeLook.isEnabled();
@@ -943,6 +959,11 @@ public final class ClientConfig
             return "Time changer";
         }
 
+        if (SECTION_NOHITDELAY.equals(section))
+        {
+            return "No hit delay";
+        }
+
         return section;
     }
 
@@ -978,6 +999,7 @@ public final class ClientConfig
             LookVector.resetToDefaults();
         JumpDelay.resetToDefaults();
         TimeChanger.resetToDefaults();
+        NoHitDelay.resetToDefaults();
 
             File file = getConfigFile();
             Map<String, Map<String, String>> parsed = parse(file);
@@ -1278,6 +1300,7 @@ public final class ClientConfig
             LookVector.reset();
             JumpDelay.reset();
             TimeChanger.reset();
+            NoHitDelay.reset();
 
             GameSettings settings = gameSettings();
 
