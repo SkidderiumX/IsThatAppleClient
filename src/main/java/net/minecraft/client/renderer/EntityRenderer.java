@@ -17,7 +17,6 @@ import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.commands.Animations;
 import net.minecraft.client.commands.FreeLook;
-import net.minecraft.client.commands.ReachCircle;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.gui.GuiChat;
 import net.minecraft.client.gui.GuiDownloadTerrain;
@@ -1386,12 +1385,6 @@ public class EntityRenderer implements IResourceManagerReloadListener
         }
     }
 
-    public void renderStreamIndicator(float partialTicks)
-    {
-        this.setupOverlayRendering();
-        this.mc.ingameGUI.renderStreamIndicator(new ScaledResolution(this.mc));
-    }
-
     private boolean isDrawBlockOutline()
     {
         if (!this.drawBlockOutline)
@@ -1842,10 +1835,6 @@ public class EntityRenderer implements IResourceManagerReloadListener
             this.mc.mcProfiler.endStartSection("forge_render_last");
             Reflector.callVoid(Reflector.ForgeHooksClient_dispatchRenderLast, new Object[] {renderglobal, Float.valueOf(partialTicks)});
         }
-
-        // Overlays the finished world. Runs on every pass, which is what anaglyph wants: each pass
-        // carries its own colour mask, so drawing here puts the ring in both eyes.
-        ReachCircle.render(partialTicks);
 
         this.mc.mcProfiler.endStartSection("hand");
 

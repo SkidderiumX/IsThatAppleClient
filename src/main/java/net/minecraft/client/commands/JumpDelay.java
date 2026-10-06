@@ -18,9 +18,7 @@ import java.io.File;
  * where the jump goes. Only riding sends a jump flag, in {@code C0CPacketInput}, and that is
  * gated on the same cooldown so the horse does not jump on a tick the player did not.</p>
  *
- * <p>Counted in ticks. Those are world ticks, and {@link TickSpeed} holds the world to 20 a
- * second whatever the client's own tick rate is, so raising that rate does not quietly shorten
- * this. The two settings cannot disagree about how long a tick is.</p>
+ * <p>Counted in ticks. The world runs at 20 ticks a second, so the gap stays put.</p>
  *
  * <p>Settings are stored in {@value ClientConfig#FILE_NAME} in the game directory and rewritten on
  * every change.</p>

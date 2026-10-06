@@ -18,8 +18,7 @@ import net.minecraft.util.EnumChatFormatting;
  * behind a setting. One difference from vanilla: the gap runs down whatever the key is doing, so
  * letting go mid-gap and pressing again does not hand back a free instant jump.</p>
  *
- * <p>In ticks. Those are world ticks, and {@link TickSpeed} holds the world to 20 a second, so
- * raising the tick rate will not quietly shorten the gap.</p>
+ * <p>In ticks. The world runs at 20 ticks a second.</p>
  *
  * <p>Settings are stored in {@value ClientConfig#FILE_NAME} in the game directory and rewritten on
  * every change.</p>
