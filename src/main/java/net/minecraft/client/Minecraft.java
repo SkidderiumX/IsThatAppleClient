@@ -1353,6 +1353,14 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
     private void sendClickBlockToController(boolean leftClick)
     {
+        // While free look holds the camera off the body, clicks would land wherever the camera
+        // happens to point rather than where the player faces, so the hold is read as released:
+        // in-progress breaking stops and its cleanup runs, exactly as if the key came up.
+        if (FreeLook.isActive())
+        {
+            leftClick = false;
+        }
+
         // Old block-hit animations. This runs in addition to the vanilla pass below,
         // matching the original: while the use key is held the player is normally
         // isUsingItem(), which makes vanilla's own branch inert, so the two do not
@@ -1406,6 +1414,13 @@ public class Minecraft implements IThreadListener, IPlayerUsage
 
     private void clickMouse()
     {
+        // No attacking or starting to break while free look is active: the crosshair follows
+        // the camera, so the hit would land off the body with no warning.
+        if (FreeLook.isActive())
+        {
+            return;
+        }
+
         if (this.leftClickCounter <= 0)
         {
             this.thePlayer.swingItem();
@@ -1450,6 +1465,12 @@ public class Minecraft implements IThreadListener, IPlayerUsage
     @SuppressWarnings("incomplete-switch")
     private void rightClickMouse()
     {
+        // No placing or using while free look is active, for the same reason as clickMouse.
+        if (FreeLook.isActive())
+        {
+            return;
+        }
+
         if (!this.playerController.getIsHittingBlock())
         {
             this.rightClickDelayTimer = 4;
